@@ -34,4 +34,21 @@ echo "▶ docker compose up -d"
 cd "$(dirname "$0")/.."
 docker compose up -d   # 이미지 자동 pull
 
+# ──────────────────────────────────────────────
+# 5) OTBR 서비스 등록 & mDNS 전환
+echo "▶ OTBR 서비스 enable/restart 및 mDNS responder 전환"
+sudo systemctl disable avahi-daemon.socket || true
+sudo systemctl disable avahi-daemon        || true
+sudo systemctl stop avahi-daemon.socket
+sudo systemctl stop avahi-daemon
+
+sudo systemctl enable  systemd-resolved
+sudo systemctl restart systemd-resolved
+
+# systemd 서비스 매니저 재실행 (단, running 서비스는 유지)
+sudo systemctl daemon-reexec
+
+sudo systemctl enable otbr-agent
+sudo systemctl restart otbr-agent
+
 echo "✅ 설치 완료!   Home Assistant → http://<HOST>:8123"

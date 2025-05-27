@@ -22,6 +22,39 @@ sudo --preserve-env=HOME ./scripts/install.sh
 
 ---
 
+## 🗺️ Architecture Diagram
+
+```mermaid
+flowchart TD
+    %% ---------- Style Definitions ----------
+    classDef svc   fill:#f0f9ff,stroke:#0284c7,stroke-width:2px,color:#075985,rx:6,ry:6,font-weight:bold;
+    classDef infra fill:#fef9c3,stroke:#ca8a04,stroke-width:2px,color:#78350f,rx:6,ry:6,font-weight:bold;
+    classDef hw    fill:#fce7f3,stroke:#be185d,stroke-width:2px,color:#9d174d,rx:6,ry:6,font-weight:bold;
+
+    %% ---------- Node & Cluster Layout ----------
+    subgraph HW["Jetson Orin NX"]
+        class HW hw;
+        subgraph NET["Host Network"]
+            class NET infra;
+            HA["HomeAssistant<br/>(8123)"]:::svc
+            MS["Matter‑server<br/>(5580)"]:::svc
+            OTBR["OTBR<br/>(8081)"]:::svc
+        end
+    end
+
+    %% ---------- Connections ----------
+    HA -- "gRPC" --> MS
+    MS <--> |"REST / Thread radio"| OTBR
+```
+
+> **요약**
+>
+> * **HomeAssistant** (8123) ⇒ UI & Automations
+> * **Matter‑server** (5580) ⇐ gRPC from HomeAssistant / ⇔ OTBR
+> * **OTBR** (8081 REST + Thread Radio)
+
+---
+
 ## 📁 Repository Layout
 
 ```text
