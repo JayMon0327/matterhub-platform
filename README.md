@@ -15,7 +15,8 @@ Jetson Orin NX 환경에서 **HomeAssistant**와 **Matter‑server**를 `doc
 ```bash
 git clone https://github.com/JayMon0327/matterhub-platform.git
 cd matterhub-platform
-sudo --preserve-env=HOME ./scripts/install.sh
+chmod +x ./scripts/install.sh
+sudo ./scripts/install.sh
 ```
 
 > **Why `sudo --preserve-env=HOME`?**  OTBR setup 단계는 *root* 권한이 필요하지만 패치 경로(`~/matterhub-platform`)를 현재 사용자 `HOME` 그대로 사용하기 위해 환경 변수를 보존합니다.
