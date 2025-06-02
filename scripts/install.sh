@@ -30,9 +30,9 @@ echo "▶ OTBR setup (FIREWALL=0, wlan0)"
 
 # ──────────────────────────────────────────────
 # 4) HomeAssistant + Matter-server 기동
-echo "▶ docker compose up -d"
+echo "▶ sudo docker compose up -d"
 cd "$(dirname "$0")/.."
-docker compose up -d   # 이미지 자동 pull
+sudo docker compose up -d   # 이미지 자동 pull
 
 # ──────────────────────────────────────────────
 # 5) OTBR 서비스 등록 & mDNS 전환
