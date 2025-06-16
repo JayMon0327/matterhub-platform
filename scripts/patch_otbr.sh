@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # 대상 파일 경로 (필요시 절대경로로 수정)
-TARGET_FILE="/home/matterhub/Desktop/matterhub-platform/ot-br-posix/third_party/openthread/repo/src/posix/platform/multicast_routing.cpp"
+TARGET_FILE="/home/hyodol/Desktop/matterhub-platform/ot-br-posix/third_party/openthread/repo/src/posix/platform/multicast_routing.cpp"
 PATCH_START_LINE=216
 
 echo "📌 대상 파일: $TARGET_FILE"
