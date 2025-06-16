@@ -12,7 +12,7 @@ if [ ! -d "$OTBR_DIR" ]; then
   echo "▶ OTBR 소스 다운로드"
   mkdir -p "$(dirname "$OTBR_DIR")"
   git clone https://github.com/openthread/ot-br-posix.git "$OTBR_DIR"
-  (cd "$OTBR_DIR" && ./script/bootstrap)
+  (cd "$OTBR_DIR" && sudo ./script/bootstrap)
 else
   echo "▶ OTBR 소스 존재 → 건너뜀"
 fi
