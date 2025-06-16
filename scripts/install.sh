@@ -7,7 +7,7 @@ command -v docker compose >/dev/null || { echo "❌ docker compose 미설치"; e
 
 # ──────────────────────────────────────────────
 # 1) OTBR 소스 클론 & 부트스트랩
-OTBR_DIR=/home/matterhub/Desktop/matterhub-platform/ot-br-posix
+OTBR_DIR=/home/hyodol/Desktop/matterhub-platform/ot-br-posix
 if [ ! -d "$OTBR_DIR" ]; then
   echo "▶ OTBR 소스 다운로드"
   mkdir -p "$(dirname "$OTBR_DIR")"
