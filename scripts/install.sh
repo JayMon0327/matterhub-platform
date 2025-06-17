@@ -26,7 +26,7 @@ bash   "$(dirname "$0")/patch_otbr.sh"
 # ──────────────────────────────────────────────
 # 3) OTBR setup
 echo "▶ OTBR setup (FIREWALL=0, wlan0)"
-(cd "$OTBR_DIR" && FIREWALL=0 INFRA_IF_NAME=wlan0 ./script/setup)
+(cd "$OTBR_DIR" && FIREWALL=0 INFRA_IF_NAME=wlan0 OTBR_MDNS=avahi ./script/setup)
 
 # ──────────────────────────────────────────────
 # 4) HomeAssistant + Matter-server 기동
