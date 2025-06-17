@@ -48,7 +48,7 @@ sudo systemctl restart otbr-agent
 
 echo "✅ 설치 완료!   Home Assistant → http://<HOST>:8123"
 
-sudo systemctl disable avahi-daemon.socket || true
-sudo systemctl disable avahi-daemon        || true
-sudo systemctl stop avahi-daemon.socket
-sudo systemctl stop avahi-daemon
+# sudo systemctl disable avahi-daemon.socket || true
+# sudo systemctl disable avahi-daemon        || true
+# sudo systemctl stop avahi-daemon.socket
+# sudo systemctl stop avahi-daemon
