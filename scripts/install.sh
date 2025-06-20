@@ -46,9 +46,99 @@ sudo systemctl daemon-reexec
 sudo systemctl enable otbr-agent
 sudo systemctl restart otbr-agent
 
-echo "✅ 설치 완료!   Home Assistant → http://<HOST>:8123"
-
 sudo systemctl disable avahi-daemon.socket || true
 sudo systemctl disable avahi-daemon        || true
 sudo systemctl stop avahi-daemon.socket
 sudo systemctl stop avahi-daemon
+
+# ──────────────────────────────────────────────
+# 6) Zeroconf Relay Agent 설치 및 실행(Matter<->OTBR 연동)
+echo "▶ Zeroconf Relay Agent 설치 중..."
+
+# python + zeroconf 설치
+sudo apt-get update
+sudo apt-get install -y python3 python3-pip avahi-daemon
+pip3 install zeroconf
+
+# relay_zeroconf.py 저장
+sudo tee /opt/relay_zeroconf.py > /dev/null << 'EOF'
+import re
+import socket
+import subprocess
+from zeroconf import Zeroconf, ServiceInfo
+
+SERVICE_TYPE = "_matter._udp.local."
+PORT = 5540
+
+zeroconf = Zeroconf()
+registered = {}
+
+def register_mdns_service(hostname: str, ip6: str):
+    global registered
+    service_name = f"{hostname}.{SERVICE_TYPE}"
+    server_name = f"{hostname}.local."
+
+    if service_name in registered:
+        return
+
+    try:
+        info = ServiceInfo(
+            SERVICE_TYPE,
+            service_name,
+            addresses=[socket.inet_pton(socket.AF_INET6, ip6)],
+            port=PORT,
+            properties={},
+            server=server_name,
+        )
+        zeroconf.register_service(info)
+        registered[service_name] = info
+        print(f"[+] Registered mDNS service: {hostname} → {ip6}")
+    except Exception as e:
+        print(f"[!] Registration failed: {hostname}, reason: {e}")
+
+def parse_logs():
+    print("[*] Watching otbr-agent logs (via journalctl)...")
+    cmd = ["journalctl", "-u", "otbr-agent", "-f", "-n", "0"]
+    process = subprocess.Popen(cmd, stdout=subprocess.PIPE, text=True)
+
+    pattern = re.compile(r"Host:([A-Z0-9]+)\.default\.service\.arpa.*(?:address.*)?(?:\[)?([a-fA-F0-9:]{4,})?")
+
+    for line in process.stdout:
+        match = pattern.search(line)
+        if match:
+            hostname = match.group(1)
+            ip6 = match.group(2)
+            if ip6:
+                register_mdns_service(hostname, ip6)
+
+try:
+    parse_logs()
+except KeyboardInterrupt:
+    print("\n[!] Stopping Zeroconf relay.")
+    zeroconf.close()
+EOF
+
+# systemd 서비스 등록
+sudo tee /etc/systemd/system/relay-zeroconf.service > /dev/null << EOF
+[Unit]
+Description=Relay OTBR hostname to Zeroconf mDNS
+After=network.target otbr-agent.service
+
+[Service]
+ExecStart=/usr/bin/python3 /opt/relay_zeroconf.py
+Restart=always
+User=root
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# 서비스 적용
+sudo systemctl daemon-reexec
+sudo systemctl daemon-reload
+sudo systemctl enable --now relay-zeroconf.service
+
+echo "✅ 설치 완료!"
+echo "🔎 Zeroconf Relay 상태 확인: sudo systemctl status relay-zeroconf.service"
+echo "🔎 로그 실시간 보기:        journalctl -u relay-zeroconf.service -f"
+echo "🌐 Home Assistant 접속:     http://<Jetson_IP>:8123"
