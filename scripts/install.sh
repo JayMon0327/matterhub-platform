@@ -52,93 +52,30 @@ sudo systemctl stop avahi-daemon.socket
 sudo systemctl stop avahi-daemon
 
 # ──────────────────────────────────────────────
-# 6) Zeroconf Relay Agent 설치 및 실행(Matter<->OTBR 연동)
-echo "▶ Zeroconf Relay Agent 설치 중..."
+# 7) 로그 회전 설정
+echo "▶ 로그 자동 회전 설정 중..."
 
-# python + zeroconf 설치
-sudo apt-get update
-sudo apt-get install -y python3 python3-pip avahi-daemon
-pip3 install zeroconf
+# logrotate 설치 및 설정
+sudo apt update -y
+sudo apt install -y logrotate
 
-# relay_zeroconf.py 저장
-sudo tee /opt/relay_zeroconf.py > /dev/null << 'EOF'
-import re
-import socket
-import subprocess
-from zeroconf import Zeroconf, ServiceInfo
+# /var/log 권한 정리
+sudo chmod 755 /var/log
+sudo chown root:root /var/log
 
-SERVICE_TYPE = "_matter._udp.local."
-PORT = 5540
+# rsyslog logrotate 설정에 su 옵션 추가 (권한 문제 예방)
+CONF_PATH="/etc/logrotate.d/rsyslog"
+if ! grep -q "su syslog adm" "$CONF_PATH"; then
+  echo "  ⮑ 'su syslog adm' 추가"
+  sudo sed -i '/\/var\/log\/syslog/ a\    su syslog adm' "$CONF_PATH"
+else
+  echo "  ⮑ 'su syslog adm' 항목 이미 존재"
+fi
 
-zeroconf = Zeroconf()
-registered = {}
+# logrotate 강제 실행 및 rsyslog 재시작
+sudo logrotate -f "$CONF_PATH"
+sudo systemctl restart rsyslog
 
-def register_mdns_service(hostname: str, ip6: str):
-    global registered
-    service_name = f"{hostname}.{SERVICE_TYPE}"
-    server_name = f"{hostname}.local."
-
-    if service_name in registered:
-        return
-
-    try:
-        info = ServiceInfo(
-            SERVICE_TYPE,
-            service_name,
-            addresses=[socket.inet_pton(socket.AF_INET6, ip6)],
-            port=PORT,
-            properties={},
-            server=server_name,
-        )
-        zeroconf.register_service(info)
-        registered[service_name] = info
-        print(f"[+] Registered mDNS service: {hostname} → {ip6}")
-    except Exception as e:
-        print(f"[!] Registration failed: {hostname}, reason: {e}")
-
-def parse_logs():
-    print("[*] Watching otbr-agent logs (via journalctl)...")
-    cmd = ["journalctl", "-u", "otbr-agent", "-f", "-n", "0"]
-    process = subprocess.Popen(cmd, stdout=subprocess.PIPE, text=True)
-
-    pattern = re.compile(r"Host:([A-Z0-9]+)\.default\.service\.arpa.*(?:address.*)?(?:\[)?([a-fA-F0-9:]{4,})?")
-
-    for line in process.stdout:
-        match = pattern.search(line)
-        if match:
-            hostname = match.group(1)
-            ip6 = match.group(2)
-            if ip6:
-                register_mdns_service(hostname, ip6)
-
-try:
-    parse_logs()
-except KeyboardInterrupt:
-    print("\n[!] Stopping Zeroconf relay.")
-    zeroconf.close()
-EOF
-
-# systemd 서비스 등록
-sudo tee /etc/systemd/system/relay-zeroconf.service > /dev/null << EOF
-[Unit]
-Description=Relay OTBR hostname to Zeroconf mDNS
-After=network.target otbr-agent.service
-
-[Service]
-ExecStart=/usr/bin/python3 /opt/relay_zeroconf.py
-Restart=always
-User=root
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-# 서비스 적용
-sudo systemctl daemon-reexec
-sudo systemctl daemon-reload
-sudo systemctl enable --now relay-zeroconf.service
-
+echo "✅ 로그 자동 회전 설정 완료"
 echo "✅ 설치 완료!"
-echo "🔎 Zeroconf Relay 상태 확인: sudo systemctl status relay-zeroconf.service"
-echo "🔎 로그 실시간 보기:        journalctl -u relay-zeroconf.service -f"
 echo "🌐 Home Assistant 접속:     http://<Jetson_IP>:8123"
