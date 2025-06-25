@@ -51,31 +51,5 @@ sudo systemctl disable avahi-daemon        || true
 sudo systemctl stop avahi-daemon.socket
 sudo systemctl stop avahi-daemon
 
-# ──────────────────────────────────────────────
-# 7) 로그 회전 설정
-echo "▶ 로그 자동 회전 설정 중..."
-
-# logrotate 설치 및 설정
-sudo apt update -y
-sudo apt install -y logrotate
-
-# /var/log 권한 정리
-sudo chmod 755 /var/log
-sudo chown root:root /var/log
-
-# rsyslog logrotate 설정에 su 옵션 추가 (권한 문제 예방)
-CONF_PATH="/etc/logrotate.d/rsyslog"
-if ! grep -q "su syslog adm" "$CONF_PATH"; then
-  echo "  ⮑ 'su syslog adm' 추가"
-  sudo sed -i '/\/var\/log\/syslog/ a\    su syslog adm' "$CONF_PATH"
-else
-  echo "  ⮑ 'su syslog adm' 항목 이미 존재"
-fi
-
-# logrotate 강제 실행 및 rsyslog 재시작
-sudo logrotate -f "$CONF_PATH"
-sudo systemctl restart rsyslog
-
-echo "✅ 로그 자동 회전 설정 완료"
 echo "✅ 설치 완료!"
 echo "🌐 Home Assistant 접속:     http://<Jetson_IP>:8123"
