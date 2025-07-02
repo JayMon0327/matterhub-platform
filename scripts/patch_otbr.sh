@@ -1,34 +1,36 @@
 #!/bin/bash
+set -euo pipefail
 
-# 대상 파일 경로 (필요시 절대경로로 수정)
 TARGET_FILE="/home/hyodol/Desktop/matterhub-platform/ot-br-posix/third_party/openthread/repo/src/posix/platform/multicast_routing.cpp"
-PATCH_START_LINE=216
+BACKUP_FILE="${TARGET_FILE}.bak"
+EXPECTED_SIGNATURE="void MulticastRoutingManager::InitMulticastRouterSock(void)"
 
 echo "📌 대상 파일: $TARGET_FILE"
 
 # 1. 백업
-if [ ! -f "${TARGET_FILE}.bak" ]; then
-    cp "$TARGET_FILE" "${TARGET_FILE}.bak"
-    echo "🔁 백업 생성: ${TARGET_FILE}.bak"
+if [ ! -f "$BACKUP_FILE" ]; then
+    cp "$TARGET_FILE" "$BACKUP_FILE"
+    echo "🔁 백업 생성: $BACKUP_FILE"
 fi
 
-# 2. 216번째 줄에 함수 선언이 있는지 검증
-EXPECTED_SIGNATURE="void MulticastRoutingManager::InitMulticastRouterSock(void)"
-ACTUAL_SIGNATURE=$(sed -n "${PATCH_START_LINE}p" "$TARGET_FILE")
+# 2. 함수 시작 줄 찾기
+PATCH_START_LINE=$(grep -n "^$EXPECTED_SIGNATURE" "$TARGET_FILE" | cut -d: -f1 || true)
 
-if [[ "$ACTUAL_SIGNATURE" != "$EXPECTED_SIGNATURE" ]]; then
-    echo "❌ 216번째 줄에서 예상한 함수 시그니처를 찾지 못했습니다."
-    echo "   예상: $EXPECTED_SIGNATURE"
-    echo "   실제: $ACTUAL_SIGNATURE"
-    echo "   👉 파일 변경 또는 줄 수 오차가 있는지 확인하세요."
+if [[ -z "$PATCH_START_LINE" ]]; then
+    echo "❌ 함수 시그니처를 파일에서 찾을 수 없습니다."
+    echo "   예상 시그니처: $EXPECTED_SIGNATURE"
     exit 1
 fi
 
-# 3. 기존 함수 블록 제거 후 새 함수 삽입
+echo "🔍 함수 시작 위치: $PATCH_START_LINE줄"
+
+# 3. 기존 함수 제거 (중괄호 수로 블록 판단)
 echo "🛠️  InitMulticastRouterSock() 함수 패치 중..."
 
+# 상단부 보존
 head -n $((PATCH_START_LINE - 1)) "$TARGET_FILE" > "${TARGET_FILE}.patched"
 
+# 새로운 함수 정의 추가
 cat >> "${TARGET_FILE}.patched" <<'EOF'
 void MulticastRoutingManager::InitMulticastRouterSock(void)
 {
@@ -45,7 +47,6 @@ void MulticastRoutingManager::InitMulticastRouterSock(void)
     {
         if (errno == ENOPROTOOPT)
         {
-            // Can't use otbrLogWarning here — fallback to stderr
             fprintf(stderr, "MulticastRoutingManager: MRT6_INIT not supported by kernel, skipping multicast routing setup.\n");
             close(mMulticastRouterSock);
             mMulticastRouterSock = -1;
@@ -57,7 +58,6 @@ void MulticastRoutingManager::InitMulticastRouterSock(void)
         }
     }
 
-    // Filter all ICMPv6 messages
     ICMP6_FILTER_SETBLOCKALL(&filter);
     VerifyOrDie(0 == setsockopt(mMulticastRouterSock, IPPROTO_ICMPV6, ICMP6_FILTER, (void *)&filter, sizeof(filter)),
                 OT_EXIT_ERROR_ERRNO);
@@ -67,14 +67,12 @@ void MulticastRoutingManager::InitMulticastRouterSock(void)
     mif6ctl.vifc_threshold  = 1;
     mif6ctl.vifc_rate_limit = 0;
 
-    // Add Thread network interface to MIF
     mif6ctl.mif6c_mifi = kMifIndexThread;
     mif6ctl.mif6c_pifi = if_nametoindex(gNetifName);
     VerifyOrDie(mif6ctl.mif6c_pifi > 0, OT_EXIT_ERROR_ERRNO);
     VerifyOrDie(0 == setsockopt(mMulticastRouterSock, IPPROTO_IPV6, MRT6_ADD_MIF, &mif6ctl, sizeof(mif6ctl)),
                 OT_EXIT_ERROR_ERRNO);
 
-    // Add Backbone network interface to MIF
     mif6ctl.mif6c_mifi = kMifIndexBackbone;
     mif6ctl.mif6c_pifi = otSysGetInfraNetifIndex();
     VerifyOrDie(mif6ctl.mif6c_pifi > 0, OT_EXIT_ERROR_ERRNO);
@@ -83,7 +81,7 @@ void MulticastRoutingManager::InitMulticastRouterSock(void)
 }
 EOF
 
-# 함수 끝 이후부터 이어붙이기
+# 하단부 이어붙이기 (기존 함수 블록 건너뛰기)
 tail -n +$((PATCH_START_LINE + 1)) "$TARGET_FILE" | awk '
     BEGIN { skip = 1; braces = 0 }
     {
@@ -101,7 +99,5 @@ tail -n +$((PATCH_START_LINE + 1)) "$TARGET_FILE" | awk '
     }
 ' >> "${TARGET_FILE}.patched"
 
-# 덮어쓰기
 mv "${TARGET_FILE}.patched" "$TARGET_FILE"
-
 echo "✅ 패치 완료: $TARGET_FILE"
